@@ -1,8 +1,6 @@
+from datetime import datetime
 from typing import Dict, List
 
-from fyers_apiv3 import fyersModel
-
-from app.config import settings
 from app.services.auth_manager import FyersAuthManager
 from app.utils.logger import logger
 
@@ -12,43 +10,27 @@ class FyersClient:
 
     def __init__(self):
         self._client = None
+        self._token_expiry = None
         self._initialize_client()
         self.logger = logger
 
     def _initialize_client(self):
         """Initialize authenticated client"""
         auth_manager = FyersAuthManager()
-        success, auth_code = auth_manager.login()
+        profile = auth_manager.login()
 
-        if not success:
-            raise ConnectionError(f"Login failed: {auth_code}")
+        if profile["s"] != "ok":
+            raise ConnectionError(f"Login failed: {profile['message']}")
 
-        session = fyersModel.SessionModel(
-            client_id=settings.fyers_client_id,
-            secret_key=settings.fyers_secret_key,
-            redirect_uri=settings.fyers_redirect_uri,
-            response_type="code",
-            grant_type="authorization_code",
-        )
-
-        session.set_token(auth_code)
-        response = session.generate_token()
-
-        if response.get("s") == "error":
-            raise ConnectionError(f"Token generation failed: {response.get('message')}")
-
-        self._client = fyersModel.FyersModel(
-            client_id=settings.fyers_client_id,
-            token=response["access_token"],
-            log_path="/logs",
-            is_async=False,
-        )
+    def _refresh_token_if_needed(self):
+        """Refresh the token if it has expired"""
+        if datetime.now() >= self._token_expiry:
+            self._initialize_client()
 
     @property
     def client(self):
         """Get authenticated client instance"""
-        if not self._client:
-            self._initialize_client()
+        self._refresh_token_if_needed()
         return self._client
 
     def get_historical_data(

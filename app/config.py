@@ -15,8 +15,5 @@ class Settings(BaseSettings):
 
     model_config = ConfigDict(env_file=".env")
 
-    # test_mode: bool = True  # Set to False for real trading
-    # log_file: str = "trading_logs.txt"
-
 
 settings = Settings()
